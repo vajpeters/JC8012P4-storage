@@ -1,13 +1,16 @@
 #pragma once
 
 #include "esphome/components/audio/audio.h"
+#include "esphome/components/audio/audio_decoder.h"
 #include "esphome/components/jc8012p4_storage/jc8012p4_storage.h"
 #include "esphome/components/media_player/media_player.h"
+#include "esphome/components/ring_buffer/ring_buffer.h"
 #include "esphome/components/speaker/speaker.h"
 #include "esphome/core/component.h"
 
 #include <array>
 #include <cstdio>
+#include <memory>
 #include <string>
 
 namespace esphome::jc8012p4_storage {
@@ -28,18 +31,19 @@ class Jc8012p4StoragePlayer : public Component, public media_player::MediaPlayer
  protected:
   void control(const media_player::MediaPlayerCall &call) override;
   bool start_file_(const std::string &uri, bool announcement);
-  bool parse_wav_();
+  void feed_decoder_();
+  void finish_playback_();
   void stop_(bool immediate);
-  static uint16_t read_u16_(const uint8_t *data);
-  static uint32_t read_u32_(const uint8_t *data);
+  audio::AudioFileType detect_file_type_(const std::string &uri) const;
 
   Jc8012p4Storage *storage_{nullptr};
   speaker::Speaker *speaker_{nullptr};
   FILE *file_{nullptr};
-  uint32_t bytes_remaining_{0};
-  std::array<uint8_t, 4096> buffer_{};
-  size_t buffer_length_{0};
-  size_t buffer_position_{0};
+  std::shared_ptr<ring_buffer::RingBuffer> encoded_buffer_;
+  std::unique_ptr<audio::AudioDecoder> decoder_;
+  std::array<uint8_t, 4096> file_buffer_{};
+  bool file_eof_{false};
+  bool sink_ready_{false};
   bool draining_{false};
   bool muted_{false};
   bool announcement_{false};

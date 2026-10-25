@@ -4,11 +4,14 @@
 
 #include <algorithm>
 #include <cinttypes>
-#include <cstring>
+#include <cctype>
 
 namespace esphome::jc8012p4_storage {
 
 static const char *const TAG = "jc8012p4_storage.player";
+static constexpr size_t ENCODED_BUFFER_SIZE = 32 * 1024;
+static constexpr size_t DECODER_INPUT_CHUNK_SIZE = 4096;
+static constexpr size_t DECODER_OUTPUT_BUFFER_SIZE = 12 * 1024;
 
 void Jc8012p4StoragePlayer::setup() {
   this->state = media_player::MEDIA_PLAYER_STATE_IDLE;
@@ -26,33 +29,43 @@ void Jc8012p4StoragePlayer::loop() {
     }
     return;
   }
-  if (this->file_ == nullptr || this->state == media_player::MEDIA_PLAYER_STATE_PAUSED)
+  if (this->decoder_ == nullptr || this->state == media_player::MEDIA_PLAYER_STATE_PAUSED)
     return;
 
-  if (this->buffer_position_ == this->buffer_length_) {
-    if (this->bytes_remaining_ == 0) {
-      this->stop_(false);
+  this->feed_decoder_();
+  const audio::AudioDecoderState decoder_state = this->decoder_->decode(this->file_eof_);
+
+  if (!this->sink_ready_ && this->decoder_->get_audio_stream_info().has_value()) {
+    const audio::AudioStreamInfo &info = this->decoder_->get_audio_stream_info().value();
+    if (info.get_bits_per_sample() != 16 || info.get_channels() < 1 || info.get_channels() > 2) {
+      ESP_LOGE(TAG, "Unsupported decoded audio: bits=%u, channels=%u", info.get_bits_per_sample(),
+               info.get_channels());
+      this->stop_(true);
       return;
     }
-    const size_t wanted = std::min<size_t>(this->buffer_.size(), this->bytes_remaining_);
-    this->buffer_length_ = fread(this->buffer_.data(), 1, wanted, this->file_);
-    this->buffer_position_ = 0;
-    this->bytes_remaining_ -= this->buffer_length_;
-    if (this->buffer_length_ == 0) {
-      ESP_LOGW(TAG, "Unexpected end of WAV file");
-      this->stop_(false);
+    this->speaker_->set_audio_stream_info(info);
+    if (this->decoder_->add_sink(this->speaker_) != ESP_OK) {
+      ESP_LOGE(TAG, "Could not connect the decoder to the speaker");
+      this->stop_(true);
       return;
     }
+    this->speaker_->start();
+    this->sink_ready_ = true;
+    ESP_LOGI(TAG, "Audio stream: %u-bit, %u channel(s), %" PRIu32 " Hz", info.get_bits_per_sample(),
+             info.get_channels(), info.get_sample_rate());
   }
 
-  const size_t written = this->speaker_->play(this->buffer_.data() + this->buffer_position_,
-                                               this->buffer_length_ - this->buffer_position_, 0);
-  this->buffer_position_ += written;
+  if (decoder_state == audio::AudioDecoderState::FAILED) {
+    ESP_LOGE(TAG, "Audio decoding failed");
+    this->stop_(true);
+  } else if (decoder_state == audio::AudioDecoderState::FINISHED) {
+    this->finish_playback_();
+  }
 }
 
 void Jc8012p4StoragePlayer::dump_config() {
-  ESP_LOGCONFIG(TAG, "SD card WAV player:");
-  ESP_LOGCONFIG(TAG, "  Formats: PCM WAV, 16-bit, mono or stereo");
+  ESP_LOGCONFIG(TAG, "SD card media player:");
+  ESP_LOGCONFIG(TAG, "  Formats: MP3 and WAV");
 }
 
 void Jc8012p4StoragePlayer::on_shutdown() { this->stop_(true); }
@@ -61,10 +74,11 @@ media_player::MediaPlayerTraits Jc8012p4StoragePlayer::get_traits() {
   media_player::MediaPlayerTraits traits;
   traits.add_feature_flags(media_player::MediaPlayerEntityFeature::PAUSE);
   traits.clear_feature_flags(media_player::MediaPlayerEntityFeature::BROWSE_MEDIA);
-  traits.get_supported_formats().push_back(
-      {"wav", 0, 0, media_player::MediaPlayerFormatPurpose::PURPOSE_DEFAULT, 2});
-  traits.get_supported_formats().push_back(
-      {"wav", 0, 0, media_player::MediaPlayerFormatPurpose::PURPOSE_ANNOUNCEMENT, 2});
+  for (const auto purpose : {media_player::MediaPlayerFormatPurpose::PURPOSE_DEFAULT,
+                             media_player::MediaPlayerFormatPurpose::PURPOSE_ANNOUNCEMENT}) {
+    traits.get_supported_formats().push_back({"mp3", 0, 0, purpose, 0});
+    traits.get_supported_formats().push_back({"wav", 0, 0, purpose, 2});
+  }
   return traits;
 }
 
@@ -87,14 +101,16 @@ void Jc8012p4StoragePlayer::control(const media_player::MediaPlayerCall &call) {
       this->stop_(true);
       break;
     case media_player::MEDIA_PLAYER_COMMAND_PAUSE:
-      if (this->file_ != nullptr) {
+      if (this->decoder_ != nullptr) {
+        this->decoder_->set_pause_output_state(true);
         this->speaker_->set_pause_state(true);
         this->state = media_player::MEDIA_PLAYER_STATE_PAUSED;
         this->publish_state();
       }
       break;
     case media_player::MEDIA_PLAYER_COMMAND_PLAY:
-      if (this->file_ != nullptr && this->state == media_player::MEDIA_PLAYER_STATE_PAUSED) {
+      if (this->decoder_ != nullptr && this->state == media_player::MEDIA_PLAYER_STATE_PAUSED) {
+        this->decoder_->set_pause_output_state(false);
         this->speaker_->set_pause_state(false);
         this->state = this->announcement_ ? media_player::MEDIA_PLAYER_STATE_ANNOUNCING
                                          : media_player::MEDIA_PLAYER_STATE_PLAYING;
@@ -113,10 +129,12 @@ void Jc8012p4StoragePlayer::control(const media_player::MediaPlayerCall &call) {
       break;
     case media_player::MEDIA_PLAYER_COMMAND_TOGGLE:
       if (this->state == media_player::MEDIA_PLAYER_STATE_PAUSED) {
+        this->decoder_->set_pause_output_state(false);
         this->speaker_->set_pause_state(false);
         this->state = this->announcement_ ? media_player::MEDIA_PLAYER_STATE_ANNOUNCING
                                          : media_player::MEDIA_PLAYER_STATE_PLAYING;
-      } else if (this->file_ != nullptr) {
+      } else if (this->decoder_ != nullptr) {
+        this->decoder_->set_pause_output_state(true);
         this->speaker_->set_pause_state(true);
         this->state = media_player::MEDIA_PLAYER_STATE_PAUSED;
       }
@@ -129,22 +147,42 @@ void Jc8012p4StoragePlayer::control(const media_player::MediaPlayerCall &call) {
 
 bool Jc8012p4StoragePlayer::start_file_(const std::string &uri, bool announcement) {
   this->stop_(true);
-  this->file_ = this->storage_->open(uri);
-  if (this->file_ == nullptr) {
-    ESP_LOGE(TAG, "Cannot open WAV file: %s", uri.c_str());
+  const audio::AudioFileType file_type = this->detect_file_type_(uri);
+  if (file_type == audio::AudioFileType::NONE) {
+    ESP_LOGE(TAG, "Unsupported file type: %s", uri.c_str());
     return false;
   }
-  if (!this->parse_wav_()) {
+
+  this->file_ = this->storage_->open(uri);
+  if (this->file_ == nullptr) {
+    ESP_LOGE(TAG, "Cannot open audio file: %s", uri.c_str());
+    return false;
+  }
+
+  auto ring_buffer = ring_buffer::RingBuffer::create(ENCODED_BUFFER_SIZE);
+  if (ring_buffer == nullptr) {
+    ESP_LOGE(TAG, "Could not allocate the encoded-audio buffer");
     fclose(this->file_);
     this->file_ = nullptr;
     return false;
   }
+  this->encoded_buffer_ = std::shared_ptr<ring_buffer::RingBuffer>(std::move(ring_buffer));
+  this->decoder_ =
+      std::make_unique<audio::AudioDecoder>(DECODER_INPUT_CHUNK_SIZE, DECODER_OUTPUT_BUFFER_SIZE);
+  std::weak_ptr<ring_buffer::RingBuffer> encoded_buffer = this->encoded_buffer_;
+  esp_err_t err = this->decoder_->start(file_type);
+  if (err == ESP_OK)
+    err = this->decoder_->add_source(encoded_buffer);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Could not start the audio decoder: %s", esp_err_to_name(err));
+    this->stop_(true);
+    return false;
+  }
 
-  this->buffer_length_ = 0;
-  this->buffer_position_ = 0;
+  this->file_eof_ = false;
+  this->sink_ready_ = false;
   this->announcement_ = announcement;
   this->speaker_->set_pause_state(false);
-  this->speaker_->start();
   this->state = announcement ? media_player::MEDIA_PLAYER_STATE_ANNOUNCING
                              : media_player::MEDIA_PLAYER_STATE_PLAYING;
   this->publish_state();
@@ -152,51 +190,35 @@ bool Jc8012p4StoragePlayer::start_file_(const std::string &uri, bool announcemen
   return true;
 }
 
-bool Jc8012p4StoragePlayer::parse_wav_() {
-  uint8_t header[12];
-  if (fread(header, 1, sizeof(header), this->file_) != sizeof(header) || memcmp(header, "RIFF", 4) != 0 ||
-      memcmp(header + 8, "WAVE", 4) != 0) {
-    ESP_LOGE(TAG, "File is not a RIFF/WAVE file");
-    return false;
-  }
+void Jc8012p4StoragePlayer::feed_decoder_() {
+  if (this->file_eof_ || this->file_ == nullptr || this->encoded_buffer_ == nullptr)
+    return;
+  const size_t wanted = std::min(this->file_buffer_.size(), this->encoded_buffer_->free());
+  if (wanted == 0)
+    return;
 
-  bool have_format = false;
-  while (true) {
-    uint8_t chunk[8];
-    if (fread(chunk, 1, sizeof(chunk), this->file_) != sizeof(chunk))
-      break;
-    const uint32_t size = read_u32_(chunk + 4);
-    if (memcmp(chunk, "fmt ", 4) == 0) {
-      uint8_t format[16];
-      if (size < sizeof(format) || fread(format, 1, sizeof(format), this->file_) != sizeof(format))
-        break;
-      const uint16_t codec = read_u16_(format);
-      const uint16_t channels = read_u16_(format + 2);
-      const uint32_t sample_rate = read_u32_(format + 4);
-      const uint16_t bits = read_u16_(format + 14);
-      if (codec != 1 || bits != 16 || channels < 1 || channels > 2 || sample_rate < 8000 || sample_rate > 96000) {
-        ESP_LOGE(TAG, "Unsupported WAV: codec=%u, bits=%u, channels=%u, rate=%" PRIu32, codec, bits, channels,
-                 sample_rate);
-        return false;
-      }
-      this->speaker_->set_audio_stream_info(audio::AudioStreamInfo(bits, channels, sample_rate));
-      const long skip = static_cast<long>(size - sizeof(format) + (size & 1U));
-      if (skip > 0)
-        fseek(this->file_, skip, SEEK_CUR);
-      have_format = true;
-    } else if (memcmp(chunk, "data", 4) == 0) {
-      if (!have_format) {
-        ESP_LOGE(TAG, "WAV data appears before its format chunk");
-        return false;
-      }
-      this->bytes_remaining_ = size;
-      return size > 0;
-    } else {
-      fseek(this->file_, static_cast<long>(size + (size & 1U)), SEEK_CUR);
-    }
+  const size_t read = fread(this->file_buffer_.data(), 1, wanted, this->file_);
+  if (read > 0)
+    this->encoded_buffer_->write_without_replacement(this->file_buffer_.data(), read);
+  if (read < wanted) {
+    if (ferror(this->file_))
+      ESP_LOGW(TAG, "Read error near the end of the audio file");
+    this->file_eof_ = true;
+    fclose(this->file_);
+    this->file_ = nullptr;
   }
-  ESP_LOGE(TAG, "Incomplete WAV file");
-  return false;
+}
+
+void Jc8012p4StoragePlayer::finish_playback_() {
+  if (this->file_ != nullptr) {
+    fclose(this->file_);
+    this->file_ = nullptr;
+  }
+  this->decoder_.reset();
+  this->encoded_buffer_.reset();
+  this->sink_ready_ = false;
+  this->speaker_->finish();
+  this->draining_ = true;
 }
 
 void Jc8012p4StoragePlayer::stop_(bool immediate) {
@@ -204,9 +226,10 @@ void Jc8012p4StoragePlayer::stop_(bool immediate) {
     fclose(this->file_);
     this->file_ = nullptr;
   }
-  this->buffer_length_ = 0;
-  this->buffer_position_ = 0;
-  this->bytes_remaining_ = 0;
+  this->decoder_.reset();
+  this->encoded_buffer_.reset();
+  this->file_eof_ = false;
+  this->sink_ready_ = false;
   if (immediate) {
     this->speaker_->stop();
     this->draining_ = false;
@@ -214,19 +237,18 @@ void Jc8012p4StoragePlayer::stop_(bool immediate) {
       this->state = media_player::MEDIA_PLAYER_STATE_IDLE;
       this->publish_state();
     }
-  } else {
-    this->speaker_->finish();
-    this->draining_ = true;
   }
 }
 
-uint16_t Jc8012p4StoragePlayer::read_u16_(const uint8_t *data) {
-  return static_cast<uint16_t>(data[0]) | static_cast<uint16_t>(data[1]) << 8;
-}
-
-uint32_t Jc8012p4StoragePlayer::read_u32_(const uint8_t *data) {
-  return static_cast<uint32_t>(data[0]) | static_cast<uint32_t>(data[1]) << 8 |
-         static_cast<uint32_t>(data[2]) << 16 | static_cast<uint32_t>(data[3]) << 24;
+audio::AudioFileType Jc8012p4StoragePlayer::detect_file_type_(const std::string &uri) const {
+  std::string lower = uri;
+  std::transform(lower.begin(), lower.end(), lower.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  if (lower.ends_with(".mp3"))
+    return audio::AudioFileType::MP3;
+  if (lower.ends_with(".wav"))
+    return audio::AudioFileType::WAV;
+  return audio::AudioFileType::NONE;
 }
 
 }  // namespace esphome::jc8012p4_storage

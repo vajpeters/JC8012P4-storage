@@ -3,9 +3,9 @@
   "screen": {},
   "app": {
     "name": "JC8012P4-opslag",
-    "summary": "Gebruikt het microSD-slot voor opslag en optioneel lokaal afspelen van WAV-bestanden.",
-    "part_wav_player": "WAV-speler voor SD-kaart",
-    "part_wav_player_hint": "Speel lokale 16-bits PCM-WAV-bestanden af via de luidspreker van het scherm."
+    "summary": "Gebruikt het microSD-slot voor opslag en optioneel lokaal afspelen van MP3- of WAV-bestanden.",
+    "part_wav_player": "Mediaspeler voor SD-kaart",
+    "part_wav_player_hint": "Speel lokale MP3- en WAV-bestanden af via de luidspreker van het scherm."
   }
 }
 
