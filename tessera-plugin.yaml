@@ -1,0 +1,24 @@
+# SD-card support for the built-in TF slot of the Guition JC8012P4 panel.
+id: jc8012p4_storage
+version: 0.1.0
+api: "0.8"
+icon: sd
+maintainer: vajpeters
+license: MIT
+stage: beta
+topics: [media, tech]
+requires:
+  esphome: 2026.6.2
+boards: [jc8012p4a1, jc8012p4a1v2, jc8012p4a1v3]
+flash_kb: 24
+
+# WAV playback is useful only when a speaker provider, such as jc8012p4_audio, is installed.
+parts:
+  - id: wav_player
+    file: parts/wav_player.yaml
+    label: part_wav_player
+    hint: part_wav_player_hint
+    features: [speaker]
+    flash_kb: 12
+    default: true
+

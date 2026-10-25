@@ -1,0 +1,11 @@
+{
+  "_meta": { "name": "English" },
+  "screen": {},
+  "app": {
+    "name": "JC8012P4 storage",
+    "summary": "Uses the panel's microSD slot for storage and optional local WAV playback.",
+    "part_wav_player": "SD card WAV player",
+    "part_wav_player_hint": "Play local 16-bit PCM WAV files through the screen's speaker."
+  }
+}
+

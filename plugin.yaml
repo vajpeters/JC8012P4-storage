@@ -1,0 +1,13 @@
+# Fixed 4-bit SDMMC wiring from the JC8012P4A1(C_I_W_Y) schematic:
+# D0 GPIO14, D1 GPIO15, D2 GPIO16, D3 GPIO17, CLK GPIO18 and CMD GPIO19.
+jc8012p4_storage:
+  id: jc8012p4_storage_component
+  card_present:
+    name: "SD card mounted"
+  total_space:
+    name: "SD card total space"
+  free_space:
+    name: "SD card free space"
+  used_percent:
+    name: "SD card used"
+

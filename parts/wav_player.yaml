@@ -1,0 +1,8 @@
+# Local PCM WAV playback through Tessera's shared speaker feature.
+media_player:
+  - platform: jc8012p4_storage
+    id: jc8012p4_storage_player
+    name: "SD card WAV player"
+    storage_id: jc8012p4_storage_component
+    speaker: ts_speaker
+
