@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+- Fix ESPHome 2026.9 builds by explicitly enabling the ESP-IDF FATFS and SDMMC components.
+
 ## 0.2.0
 
 - Add streamed MP3 decoding from the SD card using ESPHome's `micro-mp3` codec.

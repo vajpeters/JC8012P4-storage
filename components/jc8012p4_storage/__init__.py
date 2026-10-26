@@ -2,7 +2,7 @@
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import binary_sensor, sensor, smart_display
+from esphome.components import binary_sensor, esp32, sensor, smart_display
 from esphome.const import (
     CONF_ID,
     DEVICE_CLASS_DATA_SIZE,
@@ -63,6 +63,11 @@ CONFIG_SCHEMA = cv.All(
 
 
 async def to_code(config):
+    esp32.include_builtin_idf_component("fatfs")
+    esp32.include_builtin_idf_component("esp_driver_sdmmc")
+    esp32.include_builtin_idf_component("sdmmc")
+    esp32.require_fatfs()
+
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
     await smart_display.register_plugin(var, __file__)
