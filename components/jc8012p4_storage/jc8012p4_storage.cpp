@@ -13,12 +13,19 @@ static const char *const TAG = "jc8012p4_storage";
 static constexpr const char *MOUNT_POINT = "/sdcard";
 static constexpr uint32_t CHECK_INTERVAL_MS = 30000;
 
-void Jc8012p4Storage::setup() {
+void Jc8012p4Storage::setup() { this->last_check_ = millis(); }
+
+void Jc8012p4Storage::on_ready() {
+  // SDMMC card detection can wait for hardware timeouts. Tessera and its API
+  // must be fully available before probing optional storage.
+  this->ready_ = true;
   this->mount_();
   this->last_check_ = millis();
 }
 
 void Jc8012p4Storage::loop() {
+  if (!this->ready_)
+    return;
   const uint32_t now = millis();
   if (now - this->last_check_ < CHECK_INTERVAL_MS)
     return;
