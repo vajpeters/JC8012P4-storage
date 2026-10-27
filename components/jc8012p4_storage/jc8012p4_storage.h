@@ -16,9 +16,10 @@ class Jc8012p4Storage : public Component, public tessera::Plugin {
  public:
   void setup() override;
   void loop() override;
+  void on_ready() override;
   void dump_config() override;
   void on_shutdown() override;
-  float get_setup_priority() const override { return setup_priority::DATA; }
+  float get_setup_priority() const override { return setup_priority::LATE; }
 
   void set_card_present_sensor(binary_sensor::BinarySensor *sensor) { this->card_present_sensor_ = sensor; }
   void set_total_space_sensor(sensor::Sensor *sensor) { this->total_space_sensor_ = sensor; }
@@ -40,6 +41,7 @@ class Jc8012p4Storage : public Component, public tessera::Plugin {
   sensor::Sensor *used_percent_sensor_{nullptr};
   sdmmc_card_t *card_{nullptr};
   bool mounted_{false};
+  bool ready_{false};
   uint32_t last_check_{0};
 };
 
