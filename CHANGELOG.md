@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3
+
+- Wait until Tessera is ready before initialising SDMMC, so a missing, slow, or unreadable card cannot prevent the plugin and its Home Assistant entities from being announced during startup.
+
 ## 0.2.2
 
 - Fix the built-in TF slot pin mapping to use GPIO39-GPIO44, keeping the ESP32-C6 Wi-Fi SD2 bus on GPIO14-GPIO19 free.
