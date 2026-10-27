@@ -32,11 +32,10 @@ id. Paths may use `sd://folder/file.wav`, `/sdcard/folder/file.wav` or `file:///
 
 ## Good to know
 
-- The slot uses the panel's native four-bit SDMMC connection: D0-D3 on GPIO14-GPIO17, CLK on GPIO18 and CMD on
-  GPIO19.
+- The slot uses the panel's native four-bit SDMMC connection: D0-D3 on GPIO39-GPIO42, CLK on GPIO43 and CMD on
+  GPIO44. GPIO14-GPIO19 belong to the separate SD2 link to the ESP32-C6 Wi-Fi coprocessor.
 - Cards are never formatted by the plugin. Remove the card and format or copy files using a computer.
 - Playback supports MP3 and WAV. The decoded output must be 16-bit mono or stereo; unsupported files are rejected with
   a log message.
-- This first release has been checked statically but has not yet been verified on a physical JC8012P4 panel. Use the
-  beta release with that limitation in mind and report boot logs if the card does not mount.
-
+- The plugin has been checked statically but has not yet been verified with a mounted card on a physical JC8012P4
+  panel. Use the beta release with that limitation in mind and report boot logs if the card does not mount.

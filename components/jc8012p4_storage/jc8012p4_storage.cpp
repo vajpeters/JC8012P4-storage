@@ -33,7 +33,7 @@ void Jc8012p4Storage::dump_config() {
   ESP_LOGCONFIG(TAG, "JC8012P4 SD card:");
   ESP_LOGCONFIG(TAG, "  Mount point: %s", MOUNT_POINT);
   ESP_LOGCONFIG(TAG, "  Interface: SDMMC 4-bit");
-  ESP_LOGCONFIG(TAG, "  Pins: CLK 18, CMD 19, D0 14, D1 15, D2 16, D3 17");
+  ESP_LOGCONFIG(TAG, "  Pins: CLK 43, CMD 44, D0 39, D1 40, D2 41, D3 42");
   ESP_LOGCONFIG(TAG, "  Mounted: %s", YESNO(this->mounted_));
   LOG_BINARY_SENSOR("  ", "Card present", this->card_present_sensor_);
   LOG_SENSOR("  ", "Total space", this->total_space_sensor_);
@@ -52,12 +52,12 @@ bool Jc8012p4Storage::mount_() {
   sdmmc_host_t host = SDMMC_HOST_DEFAULT();
   sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
   slot_config.width = 4;
-  slot_config.clk = GPIO_NUM_18;
-  slot_config.cmd = GPIO_NUM_19;
-  slot_config.d0 = GPIO_NUM_14;
-  slot_config.d1 = GPIO_NUM_15;
-  slot_config.d2 = GPIO_NUM_16;
-  slot_config.d3 = GPIO_NUM_17;
+  slot_config.clk = GPIO_NUM_43;
+  slot_config.cmd = GPIO_NUM_44;
+  slot_config.d0 = GPIO_NUM_39;
+  slot_config.d1 = GPIO_NUM_40;
+  slot_config.d2 = GPIO_NUM_41;
+  slot_config.d3 = GPIO_NUM_42;
   slot_config.flags |= SDMMC_SLOT_FLAG_INTERNAL_PULLUP;
 
   const esp_err_t err = esp_vfs_fat_sdmmc_mount(MOUNT_POINT, &host, &slot_config, &mount_config, &this->card_);
