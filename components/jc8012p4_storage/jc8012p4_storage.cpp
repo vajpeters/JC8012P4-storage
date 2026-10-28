@@ -6,6 +6,8 @@
 
 #include "driver/sdmmc_host.h"
 #include "esp_vfs_fat.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 namespace esphome::jc8012p4_storage {
 
@@ -16,22 +18,28 @@ static constexpr uint32_t CHECK_INTERVAL_MS = 30000;
 void Jc8012p4Storage::setup() { this->last_check_ = millis(); }
 
 void Jc8012p4Storage::on_ready() {
-  // SDMMC card detection can wait for hardware timeouts. Tessera and its API
-  // must be fully available before probing optional storage.
+  // Tessera runs plugin callbacks on core 1. On ESP32-P4, initializing the
+  // SDMMC host from that callback can fault inside the IDF driver. The mount
+  // task is pinned to core 0, as ESP-IDF's app_main is in the stock example.
   this->ready_ = true;
-  this->mount_();
-  this->last_check_ = millis();
+  this->start_mount_();
 }
 
 void Jc8012p4Storage::loop() {
   if (!this->ready_)
     return;
+
+  if (this->mount_finished_.exchange(false)) {
+    this->finish_mount_();
+    this->last_check_ = millis();
+  }
+
   const uint32_t now = millis();
   if (now - this->last_check_ < CHECK_INTERVAL_MS)
     return;
   this->last_check_ = now;
   if (!this->mounted_)
-    this->mount_();
+    this->start_mount_();
   else
     this->publish_stats_();
 }
@@ -48,9 +56,34 @@ void Jc8012p4Storage::dump_config() {
   LOG_SENSOR("  ", "Used", this->used_percent_sensor_);
 }
 
-void Jc8012p4Storage::on_shutdown() { this->unmount_(); }
+void Jc8012p4Storage::on_shutdown() {
+  if (!this->mounting_.load())
+    this->unmount_();
+}
 
-bool Jc8012p4Storage::mount_() {
+void Jc8012p4Storage::start_mount_() {
+  bool expected = false;
+  if (!this->mounting_.compare_exchange_strong(expected, true))
+    return;
+
+  this->mount_finished_.store(false);
+  const BaseType_t created =
+      xTaskCreatePinnedToCore(mount_task_, "jc_sd_mount", 6144, this, 1, nullptr, 0);
+  if (created != pdPASS) {
+    this->mounting_.store(false);
+    ESP_LOGE(TAG, "Could not create SD mount task");
+  }
+}
+
+void Jc8012p4Storage::mount_task_(void *parameter) {
+  auto *self = static_cast<Jc8012p4Storage *>(parameter);
+  self->mount_error_.store(self->mount_card_());
+  self->mounting_.store(false);
+  self->mount_finished_.store(true);
+  vTaskDelete(nullptr);
+}
+
+esp_err_t Jc8012p4Storage::mount_card_() {
   esp_vfs_fat_sdmmc_mount_config_t mount_config{};
   mount_config.format_if_mount_failed = false;
   mount_config.max_files = 5;
@@ -67,14 +100,18 @@ bool Jc8012p4Storage::mount_() {
   slot_config.d3 = GPIO_NUM_42;
   slot_config.flags |= SDMMC_SLOT_FLAG_INTERNAL_PULLUP;
 
-  const esp_err_t err = esp_vfs_fat_sdmmc_mount(MOUNT_POINT, &host, &slot_config, &mount_config, &this->card_);
+  return esp_vfs_fat_sdmmc_mount(MOUNT_POINT, &host, &slot_config, &mount_config, &this->card_);
+}
+
+void Jc8012p4Storage::finish_mount_() {
+  const esp_err_t err = static_cast<esp_err_t>(this->mount_error_.load());
   if (err != ESP_OK) {
     ESP_LOGW(TAG, "SD card mount failed: %s", esp_err_to_name(err));
     this->mounted_ = false;
     this->card_ = nullptr;
     if (this->card_present_sensor_ != nullptr)
       this->card_present_sensor_->publish_state(false);
-    return false;
+    return;
   }
 
   this->mounted_ = true;
@@ -82,7 +119,6 @@ bool Jc8012p4Storage::mount_() {
     this->card_present_sensor_->publish_state(true);
   ESP_LOGI(TAG, "SD card mounted at %s", MOUNT_POINT);
   this->publish_stats_();
-  return true;
 }
 
 void Jc8012p4Storage::unmount_() {
