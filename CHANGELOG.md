@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.4
+
+- Prevent the ESP32-P4 SDMMC driver from crashing the screen during card detection.
+- Access the built-in TF slot in SD-card SPI mode and retry a missing or unreadable card without restarting the screen.
+- Run card initialisation with its own stack so Tessera remains responsive while the card is detected.
+
 ## 0.2.3
 
 - Wait until Tessera is ready before initialising SDMMC, so a missing, slow, or unreadable card cannot prevent the plugin and its Home Assistant entities from being announced during startup.
