@@ -1,36 +1,4 @@
-"""SD-card support for the JC8012P4 Tessera panel."""
-
-import esphome.codegen as cg
-import esphome.config_validation as cv
-from esphome.components import binary_sensor, esp32, sensor, smart_display
-from esphome.const import (
-    CONF_ID,
-    DEVICE_CLASS_DATA_SIZE,
-    ENTITY_CATEGORY_DIAGNOSTIC,
-    ICON_DATABASE,
-    STATE_CLASS_MEASUREMENT,
-    UNIT_PERCENT,
-)
-
-DEPENDENCIES = ["smart_display"]
-AUTO_LOAD = ["binary_sensor", "sensor"]
-
-CONF_CARD_PRESENT = "card_present"
-CONF_CARD_DETECTED = "card_detected"
-CONF_FREE_SPACE = "free_space"
-CONF_TOTAL_SPACE = "total_space"
-CONF_USED_PERCENT = "used_percent"
-
-jc8012p4_storage_ns = cg.esphome_ns.namespace("jc8012p4_storage")
-Jc8012p4Storage = jc8012p4_storage_ns.class_(
-    "Jc8012p4Storage", cg.Component
-)
-
-CONFIG_SCHEMA = cv.All(
-    cv.Schema(
-        {
-            cv.GenerateID(): cv.declare_id(Jc8012p4Storage),
-            cv.Optional(CONF_CARD_PRESENT): binary_sensor.binary_sensor_schema(
+cv.Optional(CONF_CARD_PRESENT): binary_sensor.binary_sensor_schema(
                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
                 icon="mdi:sd",
             ),
@@ -71,6 +39,9 @@ async def to_code(config):
     esp32.include_builtin_idf_component("fatfs")
     esp32.include_builtin_idf_component("esp_driver_sdmmc")
     esp32.include_builtin_idf_component("esp_driver_spi")
+    # gpio_pullup_en() is used to work around the board's missing pull-ups.
+    esp32.include_builtin_idf_component("esp_driver_gpio")
+    # Also provides the ESP32-P4 on-chip SD LDO power-control driver.
     esp32.include_builtin_idf_component("sdmmc")
     esp32.require_fatfs()
 
@@ -93,4 +64,3 @@ async def to_code(config):
     if used_percent := config.get(CONF_USED_PERCENT):
         sens = await sensor.new_sensor(used_percent)
         cg.add(var.set_used_percent_sensor(sens))
-
