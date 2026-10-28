@@ -5,11 +5,9 @@
 #include "esphome/components/smart_display/plugin_api.h"
 #include "esphome/core/component.h"
 
-#include <atomic>
 #include <cstdio>
 #include <string>
 
-#include "esp_err.h"
 #include "sdmmc_cmd.h"
 
 namespace esphome::jc8012p4_storage {
@@ -32,10 +30,7 @@ class Jc8012p4Storage : public Component, public tessera::Plugin {
   FILE *open(const std::string &path, const char *mode = "rb");
 
  protected:
-  void start_mount_();
-  static void mount_task_(void *parameter);
-  esp_err_t mount_card_();
-  void finish_mount_();
+  bool mount_();
   void unmount_();
   void publish_stats_();
   bool make_path_(const std::string &path, std::string &absolute) const;
@@ -47,9 +42,6 @@ class Jc8012p4Storage : public Component, public tessera::Plugin {
   sdmmc_card_t *card_{nullptr};
   bool mounted_{false};
   bool ready_{false};
-  std::atomic<bool> mounting_{false};
-  std::atomic<bool> mount_finished_{false};
-  std::atomic<int> mount_error_{ESP_FAIL};
   uint32_t last_check_{0};
 };
 
