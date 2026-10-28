@@ -1,7 +1,7 @@
 # JC8012P4 storage
 
 A Tessera plugin for the built-in TF/microSD slot of the Guition JC8012P4 panel. It mounts a FAT-formatted card at
-`/sdcard` and exposes mounted, total-space, free-space and used-percentage diagnostic entities to Home Assistant.
+`/sdcard` and exposes detected, mounted, total-space, free-space and used-percentage diagnostic entities to Home Assistant.
 
 An optional media-player entity decodes local MP3 or WAV files from the card and sends the audio to Tessera's shared
 `ts_speaker`.
@@ -36,6 +36,9 @@ id. Paths may use `sd://folder/file.wav`, `/sdcard/folder/file.wav` or `file:///
   and MOSI/CMD on GPIO44. This avoids a native ESP32-P4 SDMMC driver crash. GPIO14-GPIO19 belong to the separate SD2
   link to the ESP32-C6 Wi-Fi coprocessor.
 - Cards are never formatted by the plugin. Remove the card and format or copy files using a computer.
+- **SD card detected** reports whether a card answers the SPI initialisation sequence. The TF socket has no separate
+  mechanical detection signal, so a physically inserted card that cannot communicate electrically still appears absent.
+  **SD card mounted** reports separately whether its filesystem was mounted successfully.
 - Playback supports MP3 and WAV. The decoded output must be 16-bit mono or stereo; unsupported files are rejected with
   a log message.
 - The plugin has been boot-tested on a physical JC8012P4A1 V3. When no readable card answers, the screen stays online

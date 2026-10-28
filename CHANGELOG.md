@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0
+
+- Add a separate **SD card detected** diagnostic entity, so a responding card with an unreadable or unsupported
+  filesystem can be distinguished from an empty slot and from a successfully mounted card.
+
 ## 0.2.4
 
 - Prevent the ESP32-P4 SDMMC driver from crashing the screen during card detection.

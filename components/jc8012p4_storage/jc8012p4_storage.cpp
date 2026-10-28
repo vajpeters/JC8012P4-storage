@@ -51,7 +51,8 @@ void Jc8012p4Storage::dump_config() {
   ESP_LOGCONFIG(TAG, "  Interface: SD card SPI mode");
   ESP_LOGCONFIG(TAG, "  Pins: CLK 43, MOSI/CMD 44, MISO/D0 39, CS/D3 42");
   ESP_LOGCONFIG(TAG, "  Mounted: %s", YESNO(this->mounted_));
-  LOG_BINARY_SENSOR("  ", "Card present", this->card_present_sensor_);
+  LOG_BINARY_SENSOR("  ", "Card mounted", this->card_present_sensor_);
+  LOG_BINARY_SENSOR("  ", "Card detected", this->card_detected_sensor_);
   LOG_SENSOR("  ", "Total space", this->total_space_sensor_);
   LOG_SENSOR("  ", "Free space", this->free_space_sensor_);
   LOG_SENSOR("  ", "Used", this->used_percent_sensor_);
@@ -85,6 +86,7 @@ void Jc8012p4Storage::mount_task_(void *parameter) {
 }
 
 esp_err_t Jc8012p4Storage::mount_card_() {
+  this->card_detected_.store(false);
   esp_vfs_fat_sdmmc_mount_config_t mount_config{};
   mount_config.format_if_mount_failed = false;
   mount_config.max_files = 5;
@@ -112,6 +114,10 @@ esp_err_t Jc8012p4Storage::mount_card_() {
   slot_config.host_id = static_cast<spi_host_device_t>(host.slot);
 
   err = esp_vfs_fat_sdspi_mount(MOUNT_POINT, &host, &slot_config, &mount_config, &this->card_);
+  // The JC8012P4 TF socket does not expose a mechanical card-detect pin.
+  // A timeout means no card answered the SPI initialisation sequence. Other
+  // mount errors still prove that a card responded.
+  this->card_detected_.store(err != ESP_ERR_TIMEOUT);
   if (err != ESP_OK) {
     spi_bus_free(static_cast<spi_host_device_t>(host.slot));
     this->spi_host_slot_ = -1;
@@ -121,6 +127,8 @@ esp_err_t Jc8012p4Storage::mount_card_() {
 
 void Jc8012p4Storage::finish_mount_() {
   const esp_err_t err = static_cast<esp_err_t>(this->mount_error_.load());
+  if (this->card_detected_sensor_ != nullptr)
+    this->card_detected_sensor_->publish_state(this->card_detected_.load());
   if (err != ESP_OK) {
     ESP_LOGW(TAG, "SD card mount failed: %s", esp_err_to_name(err));
     this->mounted_ = false;
@@ -147,6 +155,9 @@ void Jc8012p4Storage::unmount_() {
   }
   this->card_ = nullptr;
   this->mounted_ = false;
+  this->card_detected_.store(false);
+  if (this->card_detected_sensor_ != nullptr)
+    this->card_detected_sensor_->publish_state(false);
   if (this->card_present_sensor_ != nullptr)
     this->card_present_sensor_->publish_state(false);
 }

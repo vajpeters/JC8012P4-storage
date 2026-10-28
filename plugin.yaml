@@ -1,10 +1,12 @@
-# Fixed 4-bit SDMMC wiring from the JC8012P4A1(C_I_W_Y) schematic:
-# D0 GPIO39, D1 GPIO40, D2 GPIO41, D3 GPIO42, CLK GPIO43 and CMD GPIO44.
+# Built-in TF wiring from the JC8012P4A1(C_I_W_Y) schematic, used in SPI mode:
+# MISO/D0 GPIO39, CS/D3 GPIO42, CLK GPIO43 and MOSI/CMD GPIO44.
 # GPIO14-GPIO19 are the separate SD2 bus used by the ESP32-C6 Wi-Fi coprocessor.
 jc8012p4_storage:
   id: jc8012p4_storage_component
   card_present:
     name: "SD card mounted"
+  card_detected:
+    name: "SD card detected"
   total_space:
     name: "SD card total space"
   free_space:
