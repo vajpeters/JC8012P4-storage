@@ -22,7 +22,7 @@ void Jc8012p4Storage::on_ready() {
   // SDMMC host from that callback can fault inside the IDF driver. The mount
   // task is pinned to core 0, as ESP-IDF's app_main is in the stock example.
   this->ready_ = true;
-  this->start_mount_();
+  ESP_LOGI(TAG, "SD mount disabled for diagnostic build");
 }
 
 void Jc8012p4Storage::loop() {
