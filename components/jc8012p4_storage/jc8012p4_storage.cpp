@@ -19,7 +19,7 @@ void Jc8012p4Storage::on_ready() {
   // SDMMC card detection can wait for hardware timeouts. Tessera and its API
   // must be fully available before probing optional storage.
   this->ready_ = true;
-  ESP_LOGI(TAG, "SD mount diagnostic: driver call skipped");
+  this->mount_();
   this->last_check_ = millis();
 }
 
@@ -57,6 +57,8 @@ bool Jc8012p4Storage::mount_() {
   mount_config.allocation_unit_size = 16 * 1024;
 
   sdmmc_host_t host = SDMMC_HOST_DEFAULT();
+  // Espressif uses this on ESP32-P4 for safe unaligned FAT reads.
+  host.unaligned_multi_block_rw_max_chunk_size = 8;
   sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
   slot_config.width = 4;
   slot_config.clk = GPIO_NUM_43;
