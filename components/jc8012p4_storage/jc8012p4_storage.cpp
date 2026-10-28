@@ -4,7 +4,8 @@
 
 #include <cmath>
 
-#include "driver/sdmmc_host.h"
+#include "driver/sdspi_host.h"
+#include "driver/spi_master.h"
 #include "esp_vfs_fat.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -47,8 +48,8 @@ void Jc8012p4Storage::loop() {
 void Jc8012p4Storage::dump_config() {
   ESP_LOGCONFIG(TAG, "JC8012P4 SD card:");
   ESP_LOGCONFIG(TAG, "  Mount point: %s", MOUNT_POINT);
-  ESP_LOGCONFIG(TAG, "  Interface: SDMMC 4-bit");
-  ESP_LOGCONFIG(TAG, "  Pins: CLK 43, CMD 44, D0 39, D1 40, D2 41, D3 42");
+  ESP_LOGCONFIG(TAG, "  Interface: SD card SPI mode");
+  ESP_LOGCONFIG(TAG, "  Pins: CLK 43, MOSI/CMD 44, MISO/D0 39, CS/D3 42");
   ESP_LOGCONFIG(TAG, "  Mounted: %s", YESNO(this->mounted_));
   LOG_BINARY_SENSOR("  ", "Card present", this->card_present_sensor_);
   LOG_SENSOR("  ", "Total space", this->total_space_sensor_);
@@ -89,18 +90,33 @@ esp_err_t Jc8012p4Storage::mount_card_() {
   mount_config.max_files = 5;
   mount_config.allocation_unit_size = 16 * 1024;
 
-  sdmmc_host_t host = SDMMC_HOST_DEFAULT();
-  sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
-  slot_config.width = 4;
-  slot_config.clk = GPIO_NUM_43;
-  slot_config.cmd = GPIO_NUM_44;
-  slot_config.d0 = GPIO_NUM_39;
-  slot_config.d1 = GPIO_NUM_40;
-  slot_config.d2 = GPIO_NUM_41;
-  slot_config.d3 = GPIO_NUM_42;
-  slot_config.flags |= SDMMC_SLOT_FLAG_INTERNAL_PULLUP;
+  sdmmc_host_t host = SDSPI_HOST_DEFAULT();
+  this->spi_host_slot_ = host.slot;
 
-  return esp_vfs_fat_sdmmc_mount(MOUNT_POINT, &host, &slot_config, &mount_config, &this->card_);
+  spi_bus_config_t bus_config{};
+  bus_config.mosi_io_num = GPIO_NUM_44;
+  bus_config.miso_io_num = GPIO_NUM_39;
+  bus_config.sclk_io_num = GPIO_NUM_43;
+  bus_config.quadwp_io_num = GPIO_NUM_NC;
+  bus_config.quadhd_io_num = GPIO_NUM_NC;
+  bus_config.max_transfer_sz = 16 * 1024;
+
+  esp_err_t err = spi_bus_initialize(static_cast<spi_host_device_t>(host.slot), &bus_config, SPI_DMA_CH_AUTO);
+  if (err != ESP_OK) {
+    this->spi_host_slot_ = -1;
+    return err;
+  }
+
+  sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
+  slot_config.gpio_cs = GPIO_NUM_42;
+  slot_config.host_id = static_cast<spi_host_device_t>(host.slot);
+
+  err = esp_vfs_fat_sdspi_mount(MOUNT_POINT, &host, &slot_config, &mount_config, &this->card_);
+  if (err != ESP_OK) {
+    spi_bus_free(static_cast<spi_host_device_t>(host.slot));
+    this->spi_host_slot_ = -1;
+  }
+  return err;
 }
 
 void Jc8012p4Storage::finish_mount_() {
@@ -125,6 +141,10 @@ void Jc8012p4Storage::unmount_() {
   if (!this->mounted_)
     return;
   esp_vfs_fat_sdcard_unmount(MOUNT_POINT, this->card_);
+  if (this->spi_host_slot_ >= 0) {
+    spi_bus_free(static_cast<spi_host_device_t>(this->spi_host_slot_));
+    this->spi_host_slot_ = -1;
+  }
   this->card_ = nullptr;
   this->mounted_ = false;
   if (this->card_present_sensor_ != nullptr)
