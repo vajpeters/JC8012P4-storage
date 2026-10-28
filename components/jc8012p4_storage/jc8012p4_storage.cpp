@@ -19,7 +19,7 @@ void Jc8012p4Storage::on_ready() {
   // SDMMC card detection can wait for hardware timeouts. Tessera and its API
   // must be fully available before probing optional storage.
   this->ready_ = true;
-  this->mount_();
+  ESP_LOGI(TAG, "SD mount diagnostic: driver call skipped");
   this->last_check_ = millis();
 }
 
