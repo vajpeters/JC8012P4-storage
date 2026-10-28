@@ -65,6 +65,7 @@ CONFIG_SCHEMA = cv.All(
 async def to_code(config):
     esp32.include_builtin_idf_component("fatfs")
     esp32.include_builtin_idf_component("esp_driver_sdmmc")
+    esp32.include_builtin_idf_component("esp_driver_spi")
     esp32.include_builtin_idf_component("sdmmc")
     esp32.require_fatfs()
 
