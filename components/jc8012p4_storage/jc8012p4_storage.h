@@ -10,6 +10,7 @@
 #include <string>
 
 #include "esp_err.h"
+#include "driver/spi_master.h"
 #include "sdmmc_cmd.h"
 
 namespace esphome::jc8012p4_storage {
@@ -50,6 +51,7 @@ class Jc8012p4Storage : public Component, public tessera::Plugin {
   std::atomic<bool> mounting_{false};
   std::atomic<bool> mount_finished_{false};
   std::atomic<int> mount_error_{ESP_FAIL};
+  int spi_host_slot_{-1};
   uint32_t last_check_{0};
 };
 
