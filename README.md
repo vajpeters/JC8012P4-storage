@@ -33,7 +33,7 @@ id. Paths may use `sd://folder/file.wav`, `/sdcard/folder/file.wav` or `file:///
 ## Good to know
 
 - The plugin uses the card's SPI mode on the panel's TF wiring: MISO/D0 on GPIO39, CS/D3 on GPIO42, CLK on GPIO43
-  and MOSI/CMD on GPIO44. This avoids a native ESP32-P4 SDMMC driver crash. GPIO14-GPIO19 belong to the separate SD2
+  and MOSI/CMD on GPIO44. It also enables the socket's documented ESP_LDO_VO4 3.3 V power rail while the card is mounted. This avoids a native ESP32-P4 SDMMC driver crash. GPIO14-GPIO19 belong to the separate SD2
   link to the ESP32-C6 Wi-Fi coprocessor.
 - Cards are never formatted by the plugin. Remove the card and format or copy files using a computer.
 - **SD card detected** reports whether a card answers the SPI initialisation sequence. The TF socket has no separate

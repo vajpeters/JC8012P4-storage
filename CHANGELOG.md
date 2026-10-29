@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0
+
+- Power the TF socket through its documented ESP_LDO_VO4 3.3 V supply before SPI initialisation.
+- Retain the manual SD probe switch so a card fault remains recoverable.
+
 ## 0.3.9
 
 - Keep the SD electrical probe disabled until it is explicitly enabled from Home Assistant.

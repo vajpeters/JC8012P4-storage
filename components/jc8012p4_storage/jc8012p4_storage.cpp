@@ -17,6 +17,8 @@ static constexpr const char *MOUNT_POINT = "/sdcard";
 static constexpr uint32_t CHECK_INTERVAL_MS = 30000;
 static constexpr uint32_t INITIAL_PROBE_DELAY_MS = 15000;
 static constexpr uint32_t SPI_INIT_CLOCK_KHZ = 400;
+static constexpr int SD_LDO_CHANNEL = 4;
+static constexpr int SD_LDO_VOLTAGE_MV = 3300;
 
 void Jc8012p4Storage::setup() {
   this->last_check_ = millis();
@@ -114,6 +116,19 @@ esp_err_t Jc8012p4Storage::mount_card_() {
 
   this->card_detected_.store(false);
 
+  // The TF socket's VDD pin is wired to ESP_LDO_VO4.  Acquiring this
+  // official ESP-IDF LDO channel enables its 3.3 V supply and keeps it on
+  // while the card is mounted.
+  esp_ldo_channel_config_t ldo_config{};
+  ldo_config.chan_id = SD_LDO_CHANNEL;
+  ldo_config.voltage_mv = SD_LDO_VOLTAGE_MV;
+  esp_err_t err = esp_ldo_acquire_channel(&ldo_config, &this->ldo_channel_);
+  if (err != ESP_OK) {
+    this->ldo_channel_ = nullptr;
+    return err;
+  }
+  vTaskDelay(pdMS_TO_TICKS(10));
+
   sdmmc_host_t host = SDSPI_HOST_DEFAULT();
   host.max_freq_khz = SPI_INIT_CLOCK_KHZ;
   this->spi_host_slot_ = host.slot;
@@ -126,9 +141,11 @@ esp_err_t Jc8012p4Storage::mount_card_() {
   bus_config.quadhd_io_num = GPIO_NUM_NC;
   bus_config.max_transfer_sz = 16 * 1024;
 
-  esp_err_t err = spi_bus_initialize(static_cast<spi_host_device_t>(host.slot), &bus_config, SPI_DMA_CH_AUTO);
+  err = spi_bus_initialize(static_cast<spi_host_device_t>(host.slot), &bus_config, SPI_DMA_CH_AUTO);
   if (err != ESP_OK) {
     this->spi_host_slot_ = -1;
+    esp_ldo_release_channel(this->ldo_channel_);
+    this->ldo_channel_ = nullptr;
     return err;
   }
 
@@ -141,6 +158,8 @@ esp_err_t Jc8012p4Storage::mount_card_() {
   if (err != ESP_OK) {
     spi_bus_free(static_cast<spi_host_device_t>(host.slot));
     this->spi_host_slot_ = -1;
+    esp_ldo_release_channel(this->ldo_channel_);
+    this->ldo_channel_ = nullptr;
   }
   return err;
 }
@@ -172,6 +191,10 @@ void Jc8012p4Storage::unmount_() {
   if (this->spi_host_slot_ >= 0) {
     spi_bus_free(static_cast<spi_host_device_t>(this->spi_host_slot_));
     this->spi_host_slot_ = -1;
+  }
+  if (this->ldo_channel_ != nullptr) {
+    esp_ldo_release_channel(this->ldo_channel_);
+    this->ldo_channel_ = nullptr;
   }
   this->card_ = nullptr;
   this->mounted_ = false;

@@ -10,6 +10,7 @@
 #include <string>
 
 #include "esp_err.h"
+#include "esp_ldo_regulator.h"
 #include "driver/spi_master.h"
 #include "sdmmc_cmd.h"
 
@@ -59,6 +60,7 @@ class Jc8012p4Storage : public Component, public tessera::Plugin {
   std::atomic<int> mount_error_{ESP_FAIL};
   std::atomic<bool> card_detected_{false};
   int spi_host_slot_{-1};
+  esp_ldo_channel_handle_t ldo_channel_{nullptr};
   uint32_t last_check_{0};
 };
 

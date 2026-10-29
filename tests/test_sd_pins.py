@@ -54,3 +54,14 @@ def test_card_detection_is_separate_from_mount_state() -> None:
     assert "CONF_CARD_DETECTED" in config
     assert "err != ESP_ERR_TIMEOUT" in source
     assert "card_detected_sensor_->publish_state(this->card_detected_.load())" in source
+
+
+def test_tf_slot_enables_its_documented_ldo_supply() -> None:
+    source = SOURCE.read_text(encoding="utf-8")
+    header = HEADER.read_text(encoding="utf-8")
+
+    assert "SD_LDO_CHANNEL = 4" in source
+    assert "SD_LDO_VOLTAGE_MV = 3300" in source
+    assert "esp_ldo_acquire_channel" in source
+    assert "esp_ldo_release_channel" in source
+    assert "esp_ldo_channel_handle_t ldo_channel_" in header
