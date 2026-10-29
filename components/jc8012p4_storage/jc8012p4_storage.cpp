@@ -15,6 +15,8 @@ namespace esphome::jc8012p4_storage {
 static const char *const TAG = "jc8012p4_storage";
 static constexpr const char *MOUNT_POINT = "/sdcard";
 static constexpr uint32_t CHECK_INTERVAL_MS = 30000;
+static constexpr uint32_t INITIAL_PROBE_DELAY_MS = 15000;
+static constexpr uint32_t SPI_INIT_CLOCK_KHZ = 400;
 
 void Jc8012p4Storage::setup() { this->last_check_ = millis(); }
 
@@ -23,7 +25,7 @@ void Jc8012p4Storage::on_ready() {
   // SDMMC host from that callback can fault inside the IDF driver. The mount
   // task is pinned to core 0, as ESP-IDF's app_main is in the stock example.
   this->ready_ = true;
-  this->start_mount_();
+  this->last_check_ = millis();
 }
 
 void Jc8012p4Storage::loop() {
@@ -36,7 +38,8 @@ void Jc8012p4Storage::loop() {
   }
 
   const uint32_t now = millis();
-  if (now - this->last_check_ < CHECK_INTERVAL_MS)
+  const uint32_t interval = this->mounted_ ? CHECK_INTERVAL_MS : INITIAL_PROBE_DELAY_MS;
+  if (now - this->last_check_ < interval)
     return;
   this->last_check_ = now;
   if (!this->mounted_)
@@ -85,14 +88,15 @@ void Jc8012p4Storage::mount_task_(void *parameter) {
 }
 
 esp_err_t Jc8012p4Storage::mount_card_() {
-  this->card_detected_.store(false);
-
   esp_vfs_fat_sdmmc_mount_config_t mount_config{};
   mount_config.format_if_mount_failed = false;
   mount_config.max_files = 5;
   mount_config.allocation_unit_size = 16 * 1024;
 
+  this->card_detected_.store(false);
+
   sdmmc_host_t host = SDSPI_HOST_DEFAULT();
+  host.max_freq_khz = SPI_INIT_CLOCK_KHZ;
   this->spi_host_slot_ = host.slot;
 
   spi_bus_config_t bus_config{};
@@ -114,8 +118,6 @@ esp_err_t Jc8012p4Storage::mount_card_() {
   slot_config.host_id = static_cast<spi_host_device_t>(host.slot);
 
   err = esp_vfs_fat_sdspi_mount(MOUNT_POINT, &host, &slot_config, &mount_config, &this->card_);
-  // The TF socket has no mechanical detect switch. A timeout means no card
-  // answered; ESP_OK and ESP_FAIL mean the card responded to probing.
   this->card_detected_.store(err != ESP_ERR_TIMEOUT);
   if (err != ESP_OK) {
     spi_bus_free(static_cast<spi_host_device_t>(host.slot));
@@ -154,7 +156,6 @@ void Jc8012p4Storage::unmount_() {
   }
   this->card_ = nullptr;
   this->mounted_ = false;
-  this->card_detected_.store(false);
   if (this->card_detected_sensor_ != nullptr)
     this->card_detected_sensor_->publish_state(false);
   if (this->card_present_sensor_ != nullptr)

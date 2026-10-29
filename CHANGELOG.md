@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.7
+
+- Delay the first card probe until the screen has been online for 15 seconds.
+- Use a conservative 400 kHz SPI clock during card initialisation.
+
 ## 0.3.6
 
 - Add card detection reporting on top of the unchanged stable SPI mount implementation.
