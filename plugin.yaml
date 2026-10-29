@@ -7,8 +7,6 @@ jc8012p4_storage:
     name: "SD card mounted"
   card_detected:
     name: "SD card detected"
-  card_detected:
-    name: "SD card detected"
   total_space:
     name: "SD card total space"
   free_space:
