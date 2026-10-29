@@ -18,7 +18,6 @@ static const char *const TAG = "jc8012p4_storage";
 static constexpr const char *MOUNT_POINT = "/sdcard";
 static constexpr uint32_t CHECK_INTERVAL_MS = 30000;
 static constexpr uint32_t SPI_CLOCK_KHZ = 10000;  // Conservative starting speed for the board.
-static constexpr int SD_LDO_CHANNEL = 4;
 
 void Jc8012p4Storage::setup() { this->last_check_ = millis(); }
 
@@ -54,7 +53,6 @@ void Jc8012p4Storage::dump_config() {
   ESP_LOGCONFIG(TAG, "  Mount point: %s", MOUNT_POINT);
   ESP_LOGCONFIG(TAG, "  Interface: SPI, %u kHz", static_cast<unsigned>(SPI_CLOCK_KHZ));
   ESP_LOGCONFIG(TAG, "  Pins: CLK 43, MOSI/CMD 44, MISO/D0 39, CS/D3 42");
-  ESP_LOGCONFIG(TAG, "  SD IO power: on-chip LDO channel %d", SD_LDO_CHANNEL);
   ESP_LOGCONFIG(TAG, "  Mounted: %s", YESNO(this->mounted_));
   LOG_BINARY_SENSOR("  ", "Card mounted", this->card_present_sensor_);
   LOG_BINARY_SENSOR("  ", "Card detected", this->card_detected_sensor_);
@@ -103,20 +101,8 @@ esp_err_t Jc8012p4Storage::mount_card_() {
   sdmmc_host_t host = SDSPI_HOST_DEFAULT();
   host.max_freq_khz = SPI_CLOCK_KHZ;
 
-  // CRITICAL FOR ESP32-P4: GPIO39-44 are in the SD IO power domain.
-  // The Guition board uses on-chip LDO channel 4. Without it the card
-  // cannot answer commands although it is physically present.
-  sd_pwr_ctrl_ldo_config_t ldo_config{};
-  ldo_config.ldo_chan_id = SD_LDO_CHANNEL;
-  esp_err_t err = sd_pwr_ctrl_new_on_chip_ldo(&ldo_config, &this->pwr_ctrl_handle_);
-  if (err != ESP_OK) {
-    ESP_LOGE(TAG, "SD LDO channel %d failed: %s (0x%x)", SD_LDO_CHANNEL,
-             esp_err_to_name(err), static_cast<unsigned>(err));
-    this->pwr_ctrl_handle_ = nullptr;
-    return err;
-  }
-  host.pwr_ctrl_handle = this->pwr_ctrl_handle_;
-
+  // Use the board's existing SD IO power configuration; do not toggle an
+  // on-chip LDO during boot.
   this->spi_host_slot_ = host.slot;
   spi_bus_config_t bus_config{};
   bus_config.mosi_io_num = GPIO_NUM_44;
@@ -126,7 +112,7 @@ esp_err_t Jc8012p4Storage::mount_card_() {
   bus_config.quadhd_io_num = GPIO_NUM_NC;
   bus_config.max_transfer_sz = 16 * 1024;
 
-  err = spi_bus_initialize(static_cast<spi_host_device_t>(host.slot), &bus_config, SPI_DMA_CH_AUTO);
+  esp_err_t err = spi_bus_initialize(static_cast<spi_host_device_t>(host.slot), &bus_config, SPI_DMA_CH_AUTO);
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "SPI bus init failed: %s (0x%x)", esp_err_to_name(err), static_cast<unsigned>(err));
     this->spi_host_slot_ = -1;  // SPI bus not owned by us.
@@ -138,7 +124,7 @@ esp_err_t Jc8012p4Storage::mount_card_() {
   slot_config.gpio_cs = GPIO_NUM_42;
   slot_config.host_id = static_cast<spi_host_device_t>(host.slot);
 
-  ESP_LOGI(TAG, "Probing SD at %s via SPI (LDO4)", MOUNT_POINT);
+  ESP_LOGI(TAG, "Probing SD at %s via SPI", MOUNT_POINT);
   err = esp_vfs_fat_sdspi_mount(MOUNT_POINT, &host, &slot_config, &mount_config, &this->card_);
 
   // No mechanical card-detect switch exists on the TF socket.
@@ -186,12 +172,6 @@ void Jc8012p4Storage::release_bus_() {
     if (err != ESP_OK)
       ESP_LOGW(TAG, "SPI bus cleanup failed: %s", esp_err_to_name(err));
     this->spi_host_slot_ = -1;
-  }
-  if (this->pwr_ctrl_handle_ != nullptr) {
-    const esp_err_t err = sd_pwr_ctrl_del_on_chip_ldo(this->pwr_ctrl_handle_);
-    if (err != ESP_OK)
-      ESP_LOGW(TAG, "SD LDO cleanup failed: %s", esp_err_to_name(err));
-    this->pwr_ctrl_handle_ = nullptr;
   }
 }
 

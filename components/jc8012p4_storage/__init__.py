@@ -71,9 +71,6 @@ async def to_code(config):
     esp32.include_builtin_idf_component("fatfs")
     esp32.include_builtin_idf_component("esp_driver_sdmmc")
     esp32.include_builtin_idf_component("esp_driver_spi")
-    # gpio_pullup_en() is used to work around the board's missing pull-ups.
-    esp32.include_builtin_idf_component("esp_driver_gpio")
-    # Also provides the ESP32-P4 on-chip SD LDO power-control driver.
     esp32.include_builtin_idf_component("sdmmc")
     esp32.require_fatfs()
 

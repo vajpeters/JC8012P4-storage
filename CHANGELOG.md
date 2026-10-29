@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.4
+
+- Stop toggling the ESP32-P4 on-chip SD LDO during boot; use the board’s existing SD IO power state.
+
 ## 0.3.3
 
 - Remove manual SD GPIO pull-up reconfiguration that could destabilize the ESP32-P4 during card probing.

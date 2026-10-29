@@ -12,7 +12,6 @@
 #include "esp_err.h"
 #include "driver/spi_master.h"
 #include "sdmmc_cmd.h"
-#include "sd_pwr_ctrl_by_on_chip_ldo.h"
 
 namespace esphome::jc8012p4_storage {
 
@@ -52,7 +51,6 @@ class Jc8012p4Storage : public Component, public tessera::Plugin {
   sensor::Sensor *used_percent_sensor_{nullptr};
 
   sdmmc_card_t *card_{nullptr};
-  sd_pwr_ctrl_handle_t pwr_ctrl_handle_{nullptr};
   int spi_host_slot_{-1};
   bool mounted_{false};
   bool ready_{false};
