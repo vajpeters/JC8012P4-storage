@@ -25,7 +25,6 @@ class Jc8012p4Storage : public Component, public tessera::Plugin {
   float get_setup_priority() const override { return setup_priority::LATE; }
 
   void set_card_present_sensor(binary_sensor::BinarySensor *sensor) { this->card_present_sensor_ = sensor; }
-  void set_card_detected_sensor(binary_sensor::BinarySensor *sensor) { this->card_detected_sensor_ = sensor; }
   void set_total_space_sensor(sensor::Sensor *sensor) { this->total_space_sensor_ = sensor; }
   void set_free_space_sensor(sensor::Sensor *sensor) { this->free_space_sensor_ = sensor; }
   void set_used_percent_sensor(sensor::Sensor *sensor) { this->used_percent_sensor_ = sensor; }
@@ -39,27 +38,20 @@ class Jc8012p4Storage : public Component, public tessera::Plugin {
   esp_err_t mount_card_();
   void finish_mount_();
   void unmount_();
-  void release_bus_();
   void publish_stats_();
-  void clear_stats_();
   bool make_path_(const std::string &path, std::string &absolute) const;
 
   binary_sensor::BinarySensor *card_present_sensor_{nullptr};
-  binary_sensor::BinarySensor *card_detected_sensor_{nullptr};
   sensor::Sensor *total_space_sensor_{nullptr};
   sensor::Sensor *free_space_sensor_{nullptr};
   sensor::Sensor *used_percent_sensor_{nullptr};
-
   sdmmc_card_t *card_{nullptr};
-  int spi_host_slot_{-1};
   bool mounted_{false};
   bool ready_{false};
-
-  // Only these atomics cross the core-0 mounting task / ESPHome loop boundary.
   std::atomic<bool> mounting_{false};
   std::atomic<bool> mount_finished_{false};
   std::atomic<int> mount_error_{ESP_FAIL};
-  std::atomic<bool> card_detected_{false};
+  int spi_host_slot_{-1};
   uint32_t last_check_{0};
 };
 

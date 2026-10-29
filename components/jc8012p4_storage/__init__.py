@@ -16,7 +16,6 @@ DEPENDENCIES = ["smart_display"]
 AUTO_LOAD = ["binary_sensor", "sensor"]
 
 CONF_CARD_PRESENT = "card_present"
-CONF_CARD_DETECTED = "card_detected"
 CONF_FREE_SPACE = "free_space"
 CONF_TOTAL_SPACE = "total_space"
 CONF_USED_PERCENT = "used_percent"
@@ -31,10 +30,6 @@ CONFIG_SCHEMA = cv.All(
         {
             cv.GenerateID(): cv.declare_id(Jc8012p4Storage),
             cv.Optional(CONF_CARD_PRESENT): binary_sensor.binary_sensor_schema(
-                entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
-                icon="mdi:sd",
-            ),
-            cv.Optional(CONF_CARD_DETECTED): binary_sensor.binary_sensor_schema(
                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
                 icon="mdi:sd",
             ),
@@ -81,9 +76,6 @@ async def to_code(config):
     if card_present := config.get(CONF_CARD_PRESENT):
         sens = await binary_sensor.new_binary_sensor(card_present)
         cg.add(var.set_card_present_sensor(sens))
-    if card_detected := config.get(CONF_CARD_DETECTED):
-        sens = await binary_sensor.new_binary_sensor(card_detected)
-        cg.add(var.set_card_detected_sensor(sens))
     if total_space := config.get(CONF_TOTAL_SPACE):
         sens = await sensor.new_sensor(total_space)
         cg.add(var.set_total_space_sensor(sens))
@@ -93,3 +85,4 @@ async def to_code(config):
     if used_percent := config.get(CONF_USED_PERCENT):
         sens = await sensor.new_sensor(used_percent)
         cg.add(var.set_used_percent_sensor(sens))
+

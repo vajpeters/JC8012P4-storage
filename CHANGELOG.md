@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.5
+
+- Restore the proven stable SPI driver baseline while isolating the ESP32-P4 rollback.
+
 ## 0.3.4
 
 - Stop toggling the ESP32-P4 on-chip SD LDO during boot; use the board’s existing SD IO power state.
