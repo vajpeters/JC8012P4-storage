@@ -65,3 +65,9 @@ def test_tf_slot_enables_its_documented_ldo_supply() -> None:
     assert "esp_ldo_acquire_channel" in source
     assert "esp_ldo_release_channel" in source
     assert "esp_ldo_channel_handle_t ldo_channel_" in header
+
+
+def test_mount_loop_does_not_query_fat_volume_stats_from_the_ui_task() -> None:
+    source = SOURCE.read_text(encoding="utf-8")
+    loop = source[source.index("void Jc8012p4Storage::loop()") : source.index("void Jc8012p4Storage::dump_config()")]
+    assert "publish_stats_();" not in loop

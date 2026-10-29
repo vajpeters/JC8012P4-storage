@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.1
+
+- Keep the mounted SD filesystem stable by deferring the ESP32-P4 FAT volume-statistics query that reset the screen.
+- Card detection, mounting, and media access remain available; capacity sensors stay unknown for now.
+
 ## 0.4.0
 
 - Power the TF socket through its documented ESP_LDO_VO4 3.3 V supply before SPI initialisation.

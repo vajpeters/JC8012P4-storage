@@ -38,7 +38,7 @@ id. Paths may use `sd://folder/file.wav`, `/sdcard/folder/file.wav` or `file:///
 - Cards are never formatted by the plugin. Remove the card and format or copy files using a computer.
 - **SD card detected** reports whether a card answers the SPI initialisation sequence. The TF socket has no separate
   mechanical detection signal, so a physically inserted card that cannot communicate electrically still appears absent.
-  **SD card mounted** reports separately whether its filesystem was mounted successfully.
+  **SD card mounted** reports separately whether its filesystem was mounted successfully. Capacity sensors are temporarily unavailable on this ESP32-P4 firmware because its FAT volume-statistics call resets the device.
 - Playback supports MP3 and WAV. The decoded output must be 16-bit mono or stereo; unsupported files are rejected with
   a log message.
 - The plugin has been boot-tested on a physical JC8012P4A1 V3. When no readable card answers, the screen stays online

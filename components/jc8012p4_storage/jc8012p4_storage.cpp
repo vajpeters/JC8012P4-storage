@@ -65,8 +65,9 @@ void Jc8012p4Storage::loop() {
   this->last_check_ = now;
   if (!this->mounted_)
     this->start_mount_();
-  else
-    this->publish_stats_();
+  // esp_vfs_fat_info() re-enters the FAT VFS from Tessera's UI task on this
+  // ESP32-P4 firmware and resets the device. Keep the filesystem mounted;
+  // callers can safely use it, while volume statistics stay unavailable.
 }
 
 void Jc8012p4Storage::dump_config() {
