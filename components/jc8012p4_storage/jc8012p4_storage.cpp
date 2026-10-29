@@ -85,6 +85,8 @@ void Jc8012p4Storage::mount_task_(void *parameter) {
 }
 
 esp_err_t Jc8012p4Storage::mount_card_() {
+  this->card_detected_.store(false);
+
   esp_vfs_fat_sdmmc_mount_config_t mount_config{};
   mount_config.format_if_mount_failed = false;
   mount_config.max_files = 5;
@@ -112,6 +114,9 @@ esp_err_t Jc8012p4Storage::mount_card_() {
   slot_config.host_id = static_cast<spi_host_device_t>(host.slot);
 
   err = esp_vfs_fat_sdspi_mount(MOUNT_POINT, &host, &slot_config, &mount_config, &this->card_);
+  // The TF socket has no mechanical detect switch. A timeout means no card
+  // answered; ESP_OK and ESP_FAIL mean the card responded to probing.
+  this->card_detected_.store(err != ESP_ERR_TIMEOUT);
   if (err != ESP_OK) {
     spi_bus_free(static_cast<spi_host_device_t>(host.slot));
     this->spi_host_slot_ = -1;
@@ -121,6 +126,8 @@ esp_err_t Jc8012p4Storage::mount_card_() {
 
 void Jc8012p4Storage::finish_mount_() {
   const esp_err_t err = static_cast<esp_err_t>(this->mount_error_.load());
+  if (this->card_detected_sensor_ != nullptr)
+    this->card_detected_sensor_->publish_state(this->card_detected_.load());
   if (err != ESP_OK) {
     ESP_LOGW(TAG, "SD card mount failed: %s", esp_err_to_name(err));
     this->mounted_ = false;
@@ -147,7 +154,10 @@ void Jc8012p4Storage::unmount_() {
   }
   this->card_ = nullptr;
   this->mounted_ = false;
-  if (this->card_present_sensor_ != nullptr)
+  this->card_detected_.store(false);
+  if (this->card_detected_sensor_ != nullptr)
+    this->card_detected_sensor_->publish_state(false);
+  if (this->card_present_sensor_ != nullptr
     this->card_present_sensor_->publish_state(false);
 }
 

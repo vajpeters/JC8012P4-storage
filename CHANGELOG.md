@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.6
+
+- Add card detection reporting on top of the unchanged stable SPI mount implementation.
+
 ## 0.3.5
 
 - Restore the proven stable SPI driver baseline while isolating the ESP32-P4 rollback.
