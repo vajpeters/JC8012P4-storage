@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.3
+
+- Remove manual SD GPIO pull-up reconfiguration that could destabilize the ESP32-P4 during card probing.
+- Keep the official SPI host and on-chip SD IO LDO power-control path.
+
 ## 0.3.0
 
 - Add a separate **SD card detected** diagnostic entity, so a responding card with an unreadable or unsupported

@@ -4,7 +4,6 @@
 
 #include <cmath>
 #include <cstring>
-#include <initializer_list>
 
 #include "driver/gpio.h"
 #include "driver/sdspi_host.h"
@@ -135,26 +134,11 @@ esp_err_t Jc8012p4Storage::mount_card_() {
     return err;
   }
 
-  // The JC8012P4A1 may have no external SD pull-up resistors.
-  // Configure them AFTER SPI initializes the pins, BEFORE card probing.
-  // Pull CMD/DAT0-DAT3 high and the clock line as the board example expects.
-  // GPIO40/41 are unused in SPI mode but still connected to the SD socket.
-  for (gpio_num_t pin : {GPIO_NUM_39, GPIO_NUM_40, GPIO_NUM_41,
-                         GPIO_NUM_42, GPIO_NUM_43, GPIO_NUM_44}) {
-    err = gpio_pullup_en(pin);
-    if (err != ESP_OK) {
-      ESP_LOGE(TAG, "Pull-up on GPIO%d failed: %s (0x%x)", static_cast<int>(pin),
-               esp_err_to_name(err), static_cast<unsigned>(err));
-      this->release_bus_();
-      return err;
-    }
-  }
-
   sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
   slot_config.gpio_cs = GPIO_NUM_42;
   slot_config.host_id = static_cast<spi_host_device_t>(host.slot);
 
-  ESP_LOGI(TAG, "Probing SD at %s via SPI (LDO4 + pull-ups)", MOUNT_POINT);
+  ESP_LOGI(TAG, "Probing SD at %s via SPI (LDO4)", MOUNT_POINT);
   err = esp_vfs_fat_sdspi_mount(MOUNT_POINT, &host, &slot_config, &mount_config, &this->card_);
 
   // No mechanical card-detect switch exists on the TF socket.
