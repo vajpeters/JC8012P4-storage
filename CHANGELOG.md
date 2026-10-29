@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.2
+
+- Read SD capacity and free-space statistics in a core-0 worker, away from Tessera's UI task.
+
 ## 0.4.1
 
 - Keep the mounted SD filesystem stable by deferring the ESP32-P4 FAT volume-statistics query that reset the screen.

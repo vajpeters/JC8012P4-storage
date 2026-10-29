@@ -42,8 +42,10 @@ class Jc8012p4Storage : public Component, public tessera::Plugin {
   static void mount_task_(void *parameter);
   esp_err_t mount_card_();
   void finish_mount_();
-  void unmount_();
+  void start_stats_();
+  static void stats_task_(void *parameter);
   void publish_stats_();
+  void unmount_();
   bool make_path_(const std::string &path, std::string &absolute) const;
 
   binary_sensor::BinarySensor *card_present_sensor_{nullptr};
@@ -57,7 +59,12 @@ class Jc8012p4Storage : public Component, public tessera::Plugin {
   bool probe_enabled_{false};
   std::atomic<bool> mounting_{false};
   std::atomic<bool> mount_finished_{false};
+  std::atomic<bool> stats_running_{false};
+  std::atomic<bool> stats_finished_{false};
   std::atomic<int> mount_error_{ESP_FAIL};
+  std::atomic<int> stats_error_{ESP_FAIL};
+  std::atomic<uint64_t> stats_total_{0};
+  std::atomic<uint64_t> stats_free_{0};
   std::atomic<bool> card_detected_{false};
   int spi_host_slot_{-1};
   esp_ldo_channel_handle_t ldo_channel_{nullptr};

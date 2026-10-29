@@ -57,6 +57,8 @@ void Jc8012p4Storage::loop() {
     this->finish_mount_();
     this->last_check_ = millis();
   }
+  if (this->stats_finished_.exchange(false))
+    this->publish_stats_();
 
   const uint32_t now = millis();
   const uint32_t interval = this->mounted_ ? CHECK_INTERVAL_MS : INITIAL_PROBE_DELAY_MS;
@@ -65,9 +67,8 @@ void Jc8012p4Storage::loop() {
   this->last_check_ = now;
   if (!this->mounted_)
     this->start_mount_();
-  // esp_vfs_fat_info() re-enters the FAT VFS from Tessera's UI task on this
-  // ESP32-P4 firmware and resets the device. Keep the filesystem mounted;
-  // callers can safely use it, while volume statistics stay unavailable.
+  else
+    this->start_stats_();
 }
 
 void Jc8012p4Storage::dump_config() {
@@ -165,6 +166,30 @@ esp_err_t Jc8012p4Storage::mount_card_() {
   return err;
 }
 
+void Jc8012p4Storage::start_stats_() {
+  bool expected = false;
+  if (!this->stats_running_.compare_exchange_strong(expected, true))
+    return;
+  this->stats_finished_.store(false);
+  const BaseType_t created = xTaskCreatePinnedToCore(stats_task_, "jc_sd_stats", 4096, this, 1, nullptr, 0);
+  if (created != pdPASS) {
+    this->stats_running_.store(false);
+    ESP_LOGE(TAG, "Could not create SD statistics task");
+  }
+}
+
+void Jc8012p4Storage::stats_task_(void *parameter) {
+  auto *self = static_cast<Jc8012p4Storage *>(parameter);
+  uint64_t total = 0;
+  uint64_t free = 0;
+  self->stats_error_.store(esp_vfs_fat_info(MOUNT_POINT, &total, &free));
+  self->stats_total_.store(total);
+  self->stats_free_.store(free);
+  self->stats_running_.store(false);
+  self->stats_finished_.store(true);
+  vTaskDelete(nullptr);
+}
+
 void Jc8012p4Storage::finish_mount_() {
   const esp_err_t err = static_cast<esp_err_t>(this->mount_error_.load());
   if (this->card_detected_sensor_ != nullptr)
@@ -206,16 +231,13 @@ void Jc8012p4Storage::unmount_() {
 }
 
 void Jc8012p4Storage::publish_stats_() {
-  uint64_t total = 0;
-  uint64_t free = 0;
-  if (esp_vfs_fat_info(MOUNT_POINT, &total, &free) != ESP_OK) {
-    ESP_LOGW(TAG, "SD card is no longer readable");
-    this->unmount_();
+  if (static_cast<esp_err_t>(this->stats_error_.load()) != ESP_OK) {
+    ESP_LOGW(TAG, "SD volume statistics failed: %s", esp_err_to_name(static_cast<esp_err_t>(this->stats_error_.load())));
     return;
   }
-
+  const uint64_t total = this->stats_total_.load();
+  const uint64_t free = this->stats_free_.load();
   constexpr double BYTES_PER_GB = 1000000000.0;
-
   if (this->total_space_sensor_ != nullptr)
     this->total_space_sensor_->publish_state(static_cast<double>(total) / BYTES_PER_GB);
   if (this->free_space_sensor_ != nullptr)
