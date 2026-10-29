@@ -32,8 +32,17 @@ def test_sd_mount_waits_until_tessera_is_ready() -> None:
     assert "public tessera::Plugin" in header
     assert "setup_priority::LATE" in header
     assert "start_mount_()" not in setup
-    assert "this->start_mount_();" in ready
-    assert "if (!this->ready_)" in source
+    assert "this->ready_ = true;" in ready
+    assert "if (!this->ready_ || !this->probe_enabled_)" in source
+
+
+def test_sd_probe_requires_explicit_enable() -> None:
+    header = HEADER.read_text(encoding="utf-8")
+    source = SOURCE.read_text(encoding="utf-8")
+
+    assert "void set_probe_enabled(bool enabled);" in header
+    assert "bool probe_enabled_{false};" in header
+    assert "SD card probe enabled by Home Assistant" in source
 
 
 def test_card_detection_is_separate_from_mount_state() -> None:

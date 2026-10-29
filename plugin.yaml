@@ -13,3 +13,17 @@ jc8012p4_storage:
     name: "SD card free space"
   used_percent:
     name: "SD card used"
+
+
+switch:
+  - platform: template
+    name: "Enable SD card probe"
+    id: jc8012p4_storage_probe
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+    turn_on_action:
+      - lambda: |-
+          id(jc8012p4_storage_component).set_probe_enabled(true);
+    turn_off_action:
+      - lambda: |-
+          id(jc8012p4_storage_component).set_probe_enabled(false);

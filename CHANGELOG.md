@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.9
+
+- Keep the SD electrical probe disabled until it is explicitly enabled from Home Assistant.
+- Ensure an SD-card driver failure cannot make the screen fail its first boot after an update.
+
 ## 0.3.8
 
 - Defer FAT volume-stat queries until the mount path is proven stable.

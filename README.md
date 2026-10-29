@@ -13,7 +13,7 @@ Install a speaker provider such as [JC8012P4 audio](https://github.com/vajpeters
 2. Insert the card into the panel's TF slot before booting the screen.
 3. Add this plugin to the screen in Tessera. Leave **SD card media player** enabled if a speaker plugin is installed.
 4. Build and install the screen firmware.
-5. Check the new diagnostic entities in Home Assistant. A missing card is retried every 30 seconds.
+5. Turn on **Enable SD card probe** in Home Assistant, then check the diagnostic entities. The switch resets to off on every boot so a faulty card or wiring fault can never block the screen from starting.
 
 To play `/music/song.mp3` from the card, call Home Assistant's `media_player.play_media` action for the new
 **SD card media player** entity:

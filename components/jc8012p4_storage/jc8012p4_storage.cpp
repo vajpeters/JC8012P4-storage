@@ -18,7 +18,13 @@ static constexpr uint32_t CHECK_INTERVAL_MS = 30000;
 static constexpr uint32_t INITIAL_PROBE_DELAY_MS = 15000;
 static constexpr uint32_t SPI_INIT_CLOCK_KHZ = 400;
 
-void Jc8012p4Storage::setup() { this->last_check_ = millis(); }
+void Jc8012p4Storage::setup() {
+  this->last_check_ = millis();
+  if (this->card_detected_sensor_ != nullptr)
+    this->card_detected_sensor_->publish_state(false);
+  if (this->card_present_sensor_ != nullptr)
+    this->card_present_sensor_->publish_state(false);
+}
 
 void Jc8012p4Storage::on_ready() {
   // Tessera runs plugin callbacks on core 1. On ESP32-P4, initializing the
@@ -28,8 +34,21 @@ void Jc8012p4Storage::on_ready() {
   this->last_check_ = millis();
 }
 
+void Jc8012p4Storage::set_probe_enabled(bool enabled) {
+  if (enabled == this->probe_enabled_)
+    return;
+  this->probe_enabled_ = enabled;
+  this->last_check_ = millis();
+  if (!enabled) {
+    if (!this->mounting_.load())
+      this->unmount_();
+    return;
+  }
+  ESP_LOGI(TAG, "SD card probe enabled by Home Assistant");
+}
+
 void Jc8012p4Storage::loop() {
-  if (!this->ready_)
+  if (!this->ready_ || !this->probe_enabled_)
     return;
 
   if (this->mount_finished_.exchange(false)) {

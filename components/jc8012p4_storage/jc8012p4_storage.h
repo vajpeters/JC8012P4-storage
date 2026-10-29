@@ -24,6 +24,9 @@ class Jc8012p4Storage : public Component, public tessera::Plugin {
   void on_shutdown() override;
   float get_setup_priority() const override { return setup_priority::LATE; }
 
+  // Keep the electrical probe opt-in so a driver failure cannot block boot.
+  void set_probe_enabled(bool enabled);
+
   void set_card_present_sensor(binary_sensor::BinarySensor *sensor) { this->card_present_sensor_ = sensor; }
   void set_card_detected_sensor(binary_sensor::BinarySensor *sensor) { this->card_detected_sensor_ = sensor; }
   void set_total_space_sensor(sensor::Sensor *sensor) { this->total_space_sensor_ = sensor; }
@@ -50,6 +53,7 @@ class Jc8012p4Storage : public Component, public tessera::Plugin {
   sdmmc_card_t *card_{nullptr};
   bool mounted_{false};
   bool ready_{false};
+  bool probe_enabled_{false};
   std::atomic<bool> mounting_{false};
   std::atomic<bool> mount_finished_{false};
   std::atomic<int> mount_error_{ESP_FAIL};

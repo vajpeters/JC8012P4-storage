@@ -1,6 +1,6 @@
 # SD-card support for the built-in TF slot of the Guition JC8012P4 panel.
 id: jc8012p4_storage
-version: 0.3.8
+version: 0.3.9
 api: "0.8"
 icon: sd
 maintainer: vajpeters
