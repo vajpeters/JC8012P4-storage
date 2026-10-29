@@ -157,7 +157,7 @@ void Jc8012p4Storage::unmount_() {
   this->card_detected_.store(false);
   if (this->card_detected_sensor_ != nullptr)
     this->card_detected_sensor_->publish_state(false);
-  if (this->card_present_sensor_ != nullptr
+  if (this->card_present_sensor_ != nullptr)
     this->card_present_sensor_->publish_state(false);
 }
 
