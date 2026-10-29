@@ -143,7 +143,7 @@ void Jc8012p4Storage::finish_mount_() {
   if (this->card_present_sensor_ != nullptr)
     this->card_present_sensor_->publish_state(true);
   ESP_LOGI(TAG, "SD card mounted at %s", MOUNT_POINT);
-  this->publish_stats_();
+  ESP_LOGI(TAG, "SD filesystem mounted; volume stats deferred");
 }
 
 void Jc8012p4Storage::unmount_() {

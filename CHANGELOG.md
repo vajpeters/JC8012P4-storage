@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.8
+
+- Defer FAT volume-stat queries until the mount path is proven stable.
+
 ## 0.3.7
 
 - Delay the first card probe until the screen has been online for 15 seconds.
